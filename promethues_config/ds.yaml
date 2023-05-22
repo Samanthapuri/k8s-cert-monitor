@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: cert-monitor
+  name: cert-monitor
+spec:
+  selector:
+    matchLabels:
+      app: cert-monitor
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "8080"
+        prometheus.io/scrape: "true"
+      labels:
+        app: cert-monitor
+    spec:
+      containers:
+      - image: samanthapuri/cert_monitor:v2
+        imagePullPolicy: IfNotPresent
+        name: cert-monitor
+        volumeMounts:
+        - mountPath: /etc/kubernetes
+          name: k8s-certs
+          readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /etc/kubernetes
+          type: DirectoryOrCreate
+        name: k8s-certs
