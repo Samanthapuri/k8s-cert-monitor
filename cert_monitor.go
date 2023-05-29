@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"io/fs"
 	"log"
 	"math"
 	"net/http"
@@ -50,6 +51,14 @@ type Conf struct {
 
 func getExpiry(filepath string) float64 {
 	var data []byte
+	var info fs.FileInfo
+	info, _ = os.Stat(filepath)
+	modtime := info.ModTime()
+	now := time.Now()
+	duration := now.Sub(modtime)
+	if duration < 600 {
+		os.Exit(3)
+	}
 	if match, _ := regexp.Match(".conf$", []byte(filepath)); match {
 		yamlfile, err := os.ReadFile(filepath)
 		if err != nil {
@@ -74,9 +83,9 @@ func getExpiry(filepath string) float64 {
 	if err != nil {
 		fmt.Println(err)
 	}
-	now := time.Now()
+	now = time.Now()
 	expiry := crt.NotAfter
-	duration := expiry.Sub(now)
+	duration = expiry.Sub(now)
 	days := math.Round(duration.Hours()) / 24
 	return days
 }
