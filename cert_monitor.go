@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v3"
@@ -131,8 +132,8 @@ func main() {
 		for {
 			//apiserver certificate
 			apiserverCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/apiserver.crt"))
-                        //apiserver kubelet client certificate
-                        apiserverKubeletClientCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/apiserver-kubelet-client.crt")) 
+			//apiserver kubelet client certificate
+			apiserverKubeletClientCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/apiserver-kubelet-client.crt"))
 			//kubernetes ca certificate expiry
 			kubeCACertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/ca.crt"))
 			//front proxy ca certificate expiry
@@ -145,7 +146,7 @@ func main() {
 			adminConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/admin.conf"))
 			//controller-manager.conf certificate expiry
 			controllerManagerConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/controller-manager.conf"))
-                        time.Sleep( 100 * time.Second )
+			time.Sleep(100 * time.Second)
 		}
 	}()
 
