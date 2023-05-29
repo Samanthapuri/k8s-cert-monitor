@@ -2,18 +2,22 @@ package main
 
 import (
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
-        "encoding/base64"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v3"
 )
+
+var conf Conf
+
 type Conf struct {
 	APIVersion string `yaml:"apiVersion"`
 	Clusters   []struct {
@@ -41,6 +45,39 @@ type Conf struct {
 			ClientKeyData         string `yaml:"client-key-data"`
 		} `yaml:"user"`
 	} `yaml:"users"`
+}
+
+func getExpiry(filepath string) float64 {
+	var data []byte
+	if match, _ := regexp.Match(".conf$", []byte(filepath)); match {
+		yamlfile, err := os.ReadFile(filepath)
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = yaml.Unmarshal(yamlfile, &conf)
+		if err != nil {
+			fmt.Println(err)
+		}
+		str := conf.Users[0].User.ClientCertificateData
+		dst := make([]byte, base64.StdEncoding.DecodedLen(len(str)))
+		n, err := base64.StdEncoding.Decode(dst, []byte(str))
+		if err != nil {
+			fmt.Println("decode error:", err)
+		}
+		data = dst[:n]
+	} else {
+		data, _ = os.ReadFile(filepath)
+	}
+	data1, _ := pem.Decode(data)
+	crt, err := x509.ParseCertificate(data1.Bytes)
+	if err != nil {
+		fmt.Println(err)
+	}
+	now := time.Now()
+	expiry := crt.NotAfter
+	duration := expiry.Sub(now)
+	days := math.Round(duration.Hours()) / 24
+	return days
 }
 func main() {
 	apiserverCertificateDaysToExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -93,143 +130,22 @@ func main() {
 	go func() {
 		for {
 			//apiserver certificate
-			data, _ := os.ReadFile("/etc/kubernetes/pki/apiserver.crt")
-			data1, _ := pem.Decode(data)
-			crt, err := x509.ParseCertificate([]byte(data1.Bytes))
-			if err != nil {
-				fmt.Println(err)
-			}
-			now := time.Now()
-			expiry := crt.NotAfter
-			duration := expiry.Sub(now)
-			days := math.Round(duration.Hours()) / 24
-			apiserverCertificateDaysToExpiry.Set(days)
-
+			apiserverCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/apiserver.crt"))
+                        //apiserver kubelet client certificate
+                        apiserverKubeletClientCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/apiserver-kubelet-client.crt")) 
 			//kubernetes ca certificate expiry
-			data, _ = os.ReadFile("/etc/kubernetes/pki/ca.crt")
-			data1, _ = pem.Decode(data)
-			crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-			if err != nil {
-				fmt.Println(err)
-			}
-			now = time.Now()
-			expiry = crt.NotAfter
-			duration = expiry.Sub(now)
-			days = math.Round(duration.Hours()) / 24
-			kubeCACertificateDaysToExpiry.Set(days)
-
+			kubeCACertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/ca.crt"))
 			//front proxy ca certificate expiry
-			data, _ = os.ReadFile("/etc/kubernetes/pki/front-proxy-ca.crt")
-			data1, _ = pem.Decode(data)
-			crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-			if err != nil {
-				fmt.Println(err)
-			}
-			now = time.Now()
-			expiry = crt.NotAfter
-			duration = expiry.Sub(now)
-			days = math.Round(duration.Hours()) / 24
-			frontProxyCACertificateDaysToExpiry.Set(days)
-
+			frontProxyCACertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/front-proxy-ca.crt"))
 			//front proxy clinet certificate expiry
-			data, _ = os.ReadFile("/etc/kubernetes/pki/front-proxy-client.crt")
-			data1, _ = pem.Decode(data)
-			crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-			if err != nil {
-				fmt.Println(err)
-			}
-			now = time.Now()
-			expiry = crt.NotAfter
-			duration = expiry.Sub(now)
-			days = math.Round(duration.Hours()) / 24
-			frontProxyClientCertificateDaysToExpiry.Set(days)
-
+			frontProxyClientCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/pki/front-proxy-client.crt"))
 			//scheduleri.conf clinet certificate expiry
-			yamlfile, err := os.ReadFile("/etc/kubernetes/scheduler.conf")
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-			var conf Conf
-			err = yaml.Unmarshal(yamlfile, &conf)
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-                        str := conf.Users[0].User.ClientCertificateData
-                        dst := make([]byte, base64.StdEncoding.DecodedLen(len(str)))
-                        n, err := base64.StdEncoding.Decode(dst, []byte(str))
-                        if err != nil {
-		            fmt.Println("decode error:", err)
-		            return
-	                }
-	                data = dst[:n]
-			data1, _ = pem.Decode(data)
-			crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-			if err != nil {
-				fmt.Println(err)
-			}
-			now = time.Now()
-			expiry = crt.NotAfter
-			duration = expiry.Sub(now)
-			days = math.Round(duration.Hours()) / 24
-			schedulerConfCertificateDaysToExpiry.Set(days)
-
-                        //amdin.conf certificate expiry
-                        yamlfile, err = os.ReadFile("/etc/kubernetes/admin.conf")
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-                        err = yaml.Unmarshal(yamlfile, &conf)
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-                        str = conf.Users[0].User.ClientCertificateData
-                        dst = make([]byte, base64.StdEncoding.DecodedLen(len(str)))
-                        n, err = base64.StdEncoding.Decode(dst, []byte(str))
-                        if err != nil {
-                            fmt.Println("decode error:", err)
-                            return
-                        }
-                        data = dst[:n]
-                        data1, _ = pem.Decode(data)
-                        crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-                        if err != nil {
-                                fmt.Println(err)
-                        }
-                        now = time.Now()
-                        expiry = crt.NotAfter
-                        duration = expiry.Sub(now)
-                        days = math.Round(duration.Hours()) / 24
-                        adminConfCertificateDaysToExpiry.Set(days)
-
-
-                        //controller-manager.conf certificate expiry
-                        yamlfile, err = os.ReadFile("/etc/kubernetes/controller-manager.conf")
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-                        err = yaml.Unmarshal(yamlfile, &conf)
-                        if err != nil {
-                        fmt.Println(err)
-                        }
-                        str = conf.Users[0].User.ClientCertificateData
-                        dst = make([]byte, base64.StdEncoding.DecodedLen(len(str)))
-                        n, err = base64.StdEncoding.Decode(dst, []byte(str))
-                        if err != nil {
-                            fmt.Println("decode error:", err)
-                            return
-                        }
-                        data = dst[:n]
-                        data1, _ = pem.Decode(data)
-                        crt, err = x509.ParseCertificate([]byte(data1.Bytes))
-                        if err != nil {
-                                fmt.Println(err)
-                        }
-                        now = time.Now()
-                        expiry = crt.NotAfter
-                        duration = expiry.Sub(now)
-                        days = math.Round(duration.Hours()) / 24
-                        controllerManagerConfCertificateDaysToExpiry.Set(days)
-
+			schedulerConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/scheduler.conf"))
+			//amdin.conf certificate expiry
+			adminConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/admin.conf"))
+			//controller-manager.conf certificate expiry
+			controllerManagerConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/controller-manager.conf"))
+                        time.Sleep( 100 * time.Second )
 		}
 	}()
 
