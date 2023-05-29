@@ -155,7 +155,7 @@ func main() {
 			adminConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/admin.conf"))
 			//controller-manager.conf certificate expiry
 			controllerManagerConfCertificateDaysToExpiry.Set(getExpiry("/etc/kubernetes/controller-manager.conf"))
-			time.Sleep(100 * time.Second)
+			time.Sleep(600 * time.Second)
 		}
 	}()
 
