@@ -17,7 +17,7 @@ spec:
         app: cert-monitor
     spec:
       containers:
-      - image: samanthapuri/cert_monitor:v2
+      - image: {{ .Values.image }}
         imagePullPolicy: IfNotPresent
         name: cert-monitor
         volumeMounts:
